@@ -103,11 +103,10 @@ displayTime info =
         ++ (Time.toMonth info.zone info.time |> Debug.toString)
         ++ ", "
         ++ (Time.toHour info.zone info.time |> String.fromInt)
-        ++ "h "
+        ++ ":"
         ++ (Time.toMinute info.zone info.time |> String.fromInt)
-        ++ "m "
+        ++ ":"
         ++ (Time.toSecond info.zone info.time |> String.fromInt)
-        ++ "s"
 
 
 type alias Coords =
@@ -116,20 +115,20 @@ type alias Coords =
     }
 
 
-secondHandCoordinates : Coords -> Int -> TimeInfo -> Coords
-secondHandCoordinates center radius timeInfo =
+handCoordinates : Coords -> Int -> Float -> Int -> Float -> Coords
+handCoordinates center radius length max current =
     let
-        tickDegrees =
-            pi / 60
+        position =
+            current / toFloat max
 
-        second =
-            Time.toSecond timeInfo.zone timeInfo.time
+        degrees =
+            2 * pi * position - pi / 2
 
         dx =
-            toFloat radius * cos (tickDegrees * toFloat second)
+            toFloat radius * length * cos degrees
 
         dy =
-            toFloat radius * sin (tickDegrees * toFloat second)
+            toFloat radius * length * sin degrees
     in
     Coords (center.x + round dx) (center.y + round dy)
 
@@ -152,13 +151,27 @@ viewClock timeInfo =
         radius =
             String.fromInt r
 
-        handCoords =
-            secondHandCoordinates center r timeInfo
+        minutes =
+            toFloat (Time.toMinute timeInfo.zone timeInfo.time)
+
+        hours =
+            modBy 12 (Time.toHour timeInfo.zone timeInfo.time)
+
+        hourCoords =
+            handCoordinates center r 0.7 12 (toFloat hours + (minutes / 60))
+
+        minuteCoords =
+            handCoordinates center r 0.9 60 minutes
+
+        secondCoords =
+            handCoordinates center r 0.95 60 (toFloat (Time.toSecond timeInfo.zone timeInfo.time))
     in
     Svg.svg [ SA.width "200", SA.height "200" ]
         [ Svg.circle [ SA.cx centerX, SA.cy centerY, SA.r radius, SA.fill "none", SA.stroke "gray", SA.strokeWidth "2" ] []
         , Svg.circle [ SA.cx centerX, SA.cy centerY, SA.r "2", SA.fill "gray" ] []
-        , Svg.line [ SA.x1 centerX, SA.y1 centerY, SA.x2 (String.fromInt handCoords.x), SA.y2 (String.fromInt handCoords.y), SA.stroke "gray" ] []
+        , Svg.line [ SA.x1 centerX, SA.y1 centerY, SA.x2 (String.fromInt hourCoords.x), SA.y2 (String.fromInt hourCoords.y), SA.stroke "gray", SA.strokeWidth "3" ] []
+        , Svg.line [ SA.x1 centerX, SA.y1 centerY, SA.x2 (String.fromInt minuteCoords.x), SA.y2 (String.fromInt minuteCoords.y), SA.stroke "gray", SA.strokeWidth "2" ] []
+        , Svg.line [ SA.x1 centerX, SA.y1 centerY, SA.x2 (String.fromInt secondCoords.x), SA.y2 (String.fromInt secondCoords.y), SA.stroke "green", SA.strokeWidth "1" ] []
         ]
 
 
@@ -173,9 +186,10 @@ view model =
         , button [ onClick Reset ] [ text "reset" ]
         , button [ onClick GenerateNewValue ] [ text "random" ]
         , hr [] []
+        , div [] [ viewClock model.myTime ]
+        , div [] [ text (displayTime model.myTime) ]
         , div []
-            [ text (displayTime model.myTime)
-            , button [ onClick ChangeToUTC ] [ text "Show as UTC time" ]
+            [ button [ onClick ChangeToUTC ] [ text "Show as UTC time" ]
             , button [ onClick ChangeToLocal ] [ text "Show as local time" ]
             , button [ onClick ToggleClockTicking ]
                 [ text
@@ -187,5 +201,4 @@ view model =
                     )
                 ]
             ]
-        , div [] [ viewClock model.myTime ]
         ]
